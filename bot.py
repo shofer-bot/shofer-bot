@@ -223,8 +223,29 @@ async def link_student_start_callback(callback: CallbackQuery):
         return
 
     kb_list = [[InlineKeyboardButton(text=f"{s['name']} ({s['car_type'].upper()})", callback_data=f"link_st_id_{s['id']}")] for s in unlinked]
+    kb_list.append([InlineKeyboardButton(text="⬅️ НАЗАД", callback_data="back_to_start_menu")])
     kb = InlineKeyboardMarkup(inline_keyboard=kb_list)
     await callback.message.answer("Оберіть ваше прізвище зі списку для зв'язування акаунта:", reply_markup=kb)
+    await callback.answer()
+
+@router.callback_query(F.data == "back_to_start_menu")
+async def back_to_start_menu_callback(callback: CallbackQuery):
+    try:
+        await callback.message.edit_text("Головне меню:")
+    except Exception:
+        pass
+    user_id = callback.from_user.id
+    if is_admin(user_id):
+        kb = get_owner_kb()
+    elif is_instructor(user_id):
+        kb = get_instructor_kb()
+    elif is_student(user_id):
+        kb = get_student_kb()
+    else:
+        kb = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🔗 Зв'язати профіль учня", callback_data="link_student_start")]
+        ])
+    await callback.message.answer("Оберіть дію:", reply_markup=kb)
     await callback.answer()
 
 @router.callback_query(F.data.startswith("link_st_id_"))
@@ -260,6 +281,7 @@ async def link_profile_btn(message: Message):
         return
 
     kb_list = [[InlineKeyboardButton(text=f"{s['name']} ({s['car_type'].upper()})", callback_data=f"link_st_id_{s['id']}")] for s in unlinked]
+    kb_list.append([InlineKeyboardButton(text="⬅️ НАЗАД", callback_data="back_to_start_menu")])
     kb = InlineKeyboardMarkup(inline_keyboard=kb_list)
     await message.answer("Оберіть ваше прізвище зі списку для зв'язування акаунта:", reply_markup=kb)
 
@@ -381,6 +403,7 @@ async def process_student_name(message: Message, state: FSMContext):
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="Citroen (Механіка)", callback_data="car_citroen")],
         [InlineKeyboardButton(text="Hyundai Accent (Автомат)", callback_data="car_hyundai")],
+        [InlineKeyboardButton(text="⬅️ НАЗАД", callback_data="back_to_add_student_name")],
         [InlineKeyboardButton(text="❌ Скасувати", callback_data="cancel_add_student")]
     ])
     await message.answer(
@@ -390,12 +413,22 @@ async def process_student_name(message: Message, state: FSMContext):
     )
     await state.set_state(AddStudent.car_type)
 
+@router.callback_query(F.data == "back_to_add_student_name")
+async def back_to_add_student_name(callback: CallbackQuery, state: FSMContext):
+    await state.set_state(AddStudent.name)
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="❌ Скасувати", callback_data="cancel_add_student")]
+    ])
+    await callback.message.edit_text("Введіть ПІБ нового учня:\n*(або натисніть кнопку скасування нижче)*", reply_markup=kb, parse_mode="Markdown")
+    await callback.answer()
+
 @router.callback_query(AddStudent.car_type, F.data.startswith("car_"))
 async def process_student_car(callback: CallbackQuery, state: FSMContext):
     car_key = callback.data.split("_")[1]
     await state.update_data(car_type=car_key)
     
     kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="⬅️ НАЗАД", callback_data="back_to_add_student_car")],
         [InlineKeyboardButton(text="❌ Скасувати", callback_data="cancel_add_student")]
     ])
     
@@ -407,6 +440,18 @@ async def process_student_car(callback: CallbackQuery, state: FSMContext):
         parse_mode="Markdown"
     )
     await state.set_state(AddStudent.photo)
+    await callback.answer()
+
+@router.callback_query(F.data == "back_to_add_student_car")
+async def back_to_add_student_car(callback: CallbackQuery, state: FSMContext):
+    await state.set_state(AddStudent.car_type)
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Citroen (Механіка)", callback_data="car_citroen")],
+        [InlineKeyboardButton(text="Hyundai Accent (Автомат)", callback_data="car_hyundai")],
+        [InlineKeyboardButton(text="⬅️ НАЗАД", callback_data="back_to_add_student_name")],
+        [InlineKeyboardButton(text="❌ Скасувати", callback_data="cancel_add_student")]
+    ])
+    await callback.message.edit_text("Оберіть авто (тип коробки передач) для учня (40 годин курсу):\n*(Тариф: 900 грн/год)*", reply_markup=kb, parse_mode="Markdown")
     await callback.answer()
 
 @router.message(AddStudent.photo, F.photo)
@@ -512,7 +557,7 @@ async def med_set_callback(callback: CallbackQuery, state: FSMContext):
         kb_rows.append([InlineKeyboardButton(text="👀 Переглянути довідку", callback_data=f"med_view_{st_id}")])
         kb_rows.append([InlineKeyboardButton(text="🗑 Видалити довідку", callback_data=f"med_del_{st_id}")])
     
-    kb_rows.append([InlineKeyboardButton(text="⬅️ Назад до списку", callback_data="med_back_to_list")])
+    kb_rows.append([InlineKeyboardButton(text="⬅️ НАЗАД", callback_data="med_back_to_list")])
     kb = InlineKeyboardMarkup(inline_keyboard=kb_rows)
     
     await callback.message.edit_text(text, reply_markup=kb, parse_mode="Markdown")
@@ -523,12 +568,14 @@ async def med_add_init_callback(callback: CallbackQuery, state: FSMContext):
     st_id = int(callback.data.split("_")[3])
     await state.update_data(student_id=st_id)
     await state.set_state(UpdateMedicalPhoto.photo)
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="⬅️ НАЗАД", callback_data=f"med_set_{st_id}")],
+        [InlineKeyboardButton(text="❌ Скасувати", callback_data="med_cancel")]
+    ])
     await callback.message.edit_text(
         "📸 **Надішліть нове фото медичної довідки** у цей чат.\n\n"
-        "Або натисніть кнопку нижче для скасування.",
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="❌ Скасувати", callback_data="med_cancel")]
-        ]),
+        "Або натисніть кнопку скасування.",
+        reply_markup=kb,
         parse_mode="Markdown"
     )
     await callback.answer()
@@ -572,7 +619,7 @@ async def med_del_callback(callback: CallbackQuery, state: FSMContext):
     save_json("students", students)
 
     kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="⬅️ Назад до списку", callback_data="med_back_to_list")]
+        [InlineKeyboardButton(text="⬅️ НАЗАД", callback_data="med_back_to_list")]
     ])
 
     await callback.message.edit_text(f"🗑 Медичну довідку для учня **{student_name}** успішно видалено.", reply_markup=kb, parse_mode="Markdown")
@@ -881,7 +928,10 @@ async def start_student_payment(callback: CallbackQuery, state: FSMContext):
 async def process_payment_student_chosen(callback: CallbackQuery, state: FSMContext):
     st_id = int(callback.data.split("_")[2])
     await state.update_data(student_id=st_id)
-    await callback.message.answer("Введіть кількість годин, які сплатив учень (наприклад, `10` або `20`):", parse_mode="Markdown")
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="⬅️ НАЗАД", callback_data="add_student_payment")]
+    ])
+    await callback.message.answer("Введіть кількість годин, які сплатив учень (наприклад, `10` або `20`):", reply_markup=kb, parse_mode="Markdown")
     await state.set_state(StudentPaymentState.hours)
     await callback.answer()
 
@@ -1056,8 +1106,20 @@ async def sch_add_start_msg(message: Message, state: FSMContext):
 async def sch_choose_student(callback: CallbackQuery, state: FSMContext):
     st_id = int(callback.data.split("_")[2])
     await state.update_data(student_id=st_id)
-    await callback.message.answer("Введіть дату заняття у форматі **ДД.ММ.РРРР** (наприклад, *15.08.2026*):", parse_mode="Markdown")
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="⬅️ НАЗАД", callback_data="sch_back_to_students")]
+    ])
+    await callback.message.answer("Введіть дату заняття у форматі **ДД.ММ.РРРР** (наприклад, *15.08.2026*):", reply_markup=kb, parse_mode="Markdown")
     await state.set_state(ScheduleLesson.date)
+    await callback.answer()
+
+@router.callback_query(F.data == "sch_back_to_students")
+async def sch_back_to_students(callback: CallbackQuery, state: FSMContext):
+    students = load_json("students", [])
+    kb_list = [[InlineKeyboardButton(text=f"{s['name']} ({s['car_type'].upper()})", callback_data=f"sch_st_{s['id']}")] for s in students]
+    kb = InlineKeyboardMarkup(inline_keyboard=kb_list)
+    await callback.message.answer("Оберіть учня для запису на заняття:", reply_markup=kb)
+    await state.set_state(ScheduleLesson.student_id)
     await callback.answer()
 
 @router.message(ScheduleLesson.date)
@@ -1258,6 +1320,7 @@ async def citroen_unchanged_callback(callback: CallbackQuery, state: FSMContext)
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=f"✅ Не змінився ({hyundai_last} км)", callback_data="hyundai_unchanged")],
         [InlineKeyboardButton(text="✏️ Ввести новий пробіг", callback_data="input_hyundai_mil")],
+        [InlineKeyboardButton(text="⬅️ НАЗАД", callback_data="back_to_citroen_mil")],
         [InlineKeyboardButton(text="❌ Скасувати", callback_data="cancel_daily_report")]
     ])
     await callback.message.edit_text(
@@ -1269,9 +1332,30 @@ async def citroen_unchanged_callback(callback: CallbackQuery, state: FSMContext)
     )
     await callback.answer()
 
+@router.callback_query(F.data == "back_to_citroen_mil")
+async def back_to_citroen_mil_callback(callback: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    citroen_last = data.get("citroen_last", 0)
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=f"✅ Не змінився ({citroen_last} км)", callback_data="citroen_unchanged")],
+        [InlineKeyboardButton(text="✏️ Ввести новий пробіг", callback_data="input_citroen_mil")],
+        [InlineKeyboardButton(text="❌ Скасувати", callback_data="cancel_daily_report")]
+    ])
+    await callback.message.edit_text(
+        f"🚗 **Оновлення пробігу Citroen (МКПП)**\n"
+        f"Попередній збережений пробіг: **{citroen_last} км**.\n"
+        f"Оберіть дію:",
+        reply_markup=kb,
+        parse_mode="Markdown"
+    )
+    await callback.answer()
+
 @router.callback_query(F.data == "input_citroen_mil")
 async def input_citroen_mil_callback(callback: CallbackQuery, state: FSMContext):
-    await callback.message.edit_text("Введіть поточний **загальний пробіг** авто **Citroen (МКПП)** в кілометрах (тільки число):", parse_mode="Markdown")
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="⬅️ НАЗАД", callback_data="back_to_citroen_mil")]
+    ])
+    await callback.message.edit_text("Введіть поточний **загальний пробіг** авто **Citroen (МКПП)** в кілометрах (тільки число):", reply_markup=kb, parse_mode="Markdown")
     await state.set_state(DailyReport.citroen_mileage)
     await callback.answer()
 
@@ -1299,6 +1383,7 @@ async def process_citroen_mil(message: Message, state: FSMContext):
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=f"✅ Не змінився ({hyundai_last} км)", callback_data="hyundai_unchanged")],
         [InlineKeyboardButton(text="✏️ Ввести новий пробіг", callback_data="input_hyundai_mil")],
+        [InlineKeyboardButton(text="⬅️ НАЗАД", callback_data="back_to_citroen_mil")],
         [InlineKeyboardButton(text="❌ Скасувати", callback_data="cancel_daily_report")]
     ])
     await message.answer(
@@ -1327,6 +1412,7 @@ async def hyundai_unchanged_callback(callback: CallbackQuery, state: FSMContext)
     today_sessions = data.get("today_sessions", [])
     kb_list = [[InlineKeyboardButton(text=f"{s['name']} ({s['car_type'].upper()})", callback_data=f"rep_st_{s['id']}")] for s in students]
     kb_list.append([InlineKeyboardButton(text="🏁 Переглянути звіт (Готово)", callback_data="preview_report_flow")])
+    kb_list.append([InlineKeyboardButton(text="⬅️ НАЗАД", callback_data="back_to_hyundai_mil")])
     kb = InlineKeyboardMarkup(inline_keyboard=kb_list)
 
     summary = "📋 **Додані заняття на сьогодні:**\n"
@@ -1340,9 +1426,30 @@ async def hyundai_unchanged_callback(callback: CallbackQuery, state: FSMContext)
     await callback.message.edit_text(full_text, reply_markup=kb, parse_mode="Markdown")
     await callback.answer()
 
+@router.callback_query(F.data == "back_to_hyundai_mil")
+async def back_to_hyundai_mil_callback(callback: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    hyundai_last = data.get("hyundai_last", 0)
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=f"✅ Не змінився ({hyundai_last} км)", callback_data="hyundai_unchanged")],
+        [InlineKeyboardButton(text="✏️ Ввести новий пробіг", callback_data="input_hyundai_mil")],
+        [InlineKeyboardButton(text="❌ Скасувати", callback_data="cancel_daily_report")]
+    ])
+    await callback.message.edit_text(
+        f"🚙 **Оновлення пробігу Hyundai Accent (АКПП)**\n"
+        f"Попередній збережений пробіг: **{hyundai_last} км**.\n"
+        f"Оберіть дію:",
+        reply_markup=kb,
+        parse_mode="Markdown"
+    )
+    await callback.answer()
+
 @router.callback_query(F.data == "input_hyundai_mil")
 async def input_hyundai_mil_callback(callback: CallbackQuery, state: FSMContext):
-    await callback.message.edit_text("Введіть поточний **загальний пробіг** авто **Hyundai Accent (АКПП)** в кілометрах (тільки число):", parse_mode="Markdown")
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="⬅️ НАЗАД", callback_data="back_to_hyundai_mil")]
+    ])
+    await callback.message.edit_text("Введіть поточний **загальний пробіг** авто **Hyundai Accent (АКПП)** в кілометрах (тільки число):", reply_markup=kb, parse_mode="Markdown")
     await state.set_state(DailyReport.hyundai_mileage)
     await callback.answer()
 
@@ -1382,6 +1489,7 @@ async def send_student_menu(message_or_callback, state: FSMContext, text: str):
 
     kb_list = [[InlineKeyboardButton(text=f"{s['name']} ({s['car_type'].upper()})", callback_data=f"rep_st_{s['id']}")] for s in students]
     kb_list.append([InlineKeyboardButton(text="🏁 Переглянути звіт (Готово)", callback_data="preview_report_flow")])
+    kb_list.append([InlineKeyboardButton(text="⬅️ НАЗАД", callback_data="back_to_hyundai_mil")])
     kb = InlineKeyboardMarkup(inline_keyboard=kb_list)
 
     summary = "📋 **Додані заняття на сьогодні:**\n"
@@ -1410,6 +1518,7 @@ async def choose_student_for_report(callback: CallbackQuery, state: FSMContext):
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="1 година", callback_data="hours_1_0"), InlineKeyboardButton(text="1.5 години", callback_data="hours_1_5")],
         [InlineKeyboardButton(text="2 години", callback_data="hours_2_0")],
+        [InlineKeyboardButton(text="⬅️ НАЗАД", callback_data="back_to_student_choice")],
         [InlineKeyboardButton(text="❌ Скасувати", callback_data="cancel_daily_report")]
     ])
     
@@ -1419,6 +1528,12 @@ async def choose_student_for_report(callback: CallbackQuery, state: FSMContext):
         reply_markup=kb,
         parse_mode="Markdown"
     )
+    await callback.answer()
+
+@router.callback_query(F.data == "back_to_student_choice")
+async def back_to_student_choice_callback(callback: CallbackQuery, state: FSMContext):
+    await state.set_state(DailyReport.student_choice)
+    await send_student_menu(callback, state, "Оберіть учня, який займався сьогодні:")
     await callback.answer()
 
 @router.callback_query(DailyReport.hours_spent, F.data.startswith("hours_"))
@@ -1521,6 +1636,7 @@ async def preview_daily_report(callback: CallbackQuery, state: FSMContext):
 
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="✅ Підтвердити та надіслати", callback_data="confirm_send_report")],
+        [InlineKeyboardButton(text="⬅️ НАЗАД до вибору учнів", callback_data="back_to_student_choice")],
         [InlineKeyboardButton(text="✏️ Редагувати / Почати спочатку", callback_data="edit_report_flow")]
     ])
 
