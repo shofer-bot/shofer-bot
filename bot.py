@@ -182,27 +182,61 @@ async def process_add_student_btn(message: Message, state: FSMContext):
     if not is_authorized(message.from_user.id) or not is_admin(message.from_user.id):
         await message.answer("❌ Недостатньо прав. Ця функція лише для власників.")
         return
-    await message.answer("Введіть ПІБ нового учня:")
+    await message.answer(
+        "Введіть ПІБ нового учня:\n*(або напишіть `скасувати` для відміни)*", 
+        parse_mode="Markdown"
+    )
     await state.set_state(AddStudent.name)
 
 @router.message(AddStudent.name)
 async def process_student_name(message: Message, state: FSMContext):
+    text = message.text.strip().lower()
+    if text in ["скасувати", "відміна", "назад", "exit"]:
+        await state.clear()
+        user_id = message.from_user.id
+        kb = get_owner_kb() if is_admin(user_id) else get_instructor_kb()
+        await message.answer("❌ Додавання учня скасовано.", reply_markup=kb)
+        return
+
     await state.update_data(name=message.text)
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="Citroen (Механіка)", callback_data="car_citroen")],
-        [InlineKeyboardButton(text="Hyundai Accent (Автомат)", callback_data="car_hyundai")]
+        [InlineKeyboardButton(text="Hyundai Accent (Автомат)", callback_data="car_hyundai")],
+        [InlineKeyboardButton(text="❌ Скасувати", callback_data="cancel_add_student")]
     ])
-    await message.answer("Оберіть авто (тип коробки передач) для учня (40 годин курсу):\n*(Тариф: 900 грн/год)*", reply_markup=kb, parse_mode="Markdown")
+    await message.answer(
+        "Оберіть авто (тип коробки передач) для учня (40 годин курсу):\n*(Тариф: 900 грн/год)*", 
+        reply_markup=kb, 
+        parse_mode="Markdown"
+    )
     await state.set_state(AddStudent.car_type)
+
+@router.callback_query(AddStudent.car_type, F.data == "cancel_add_student")
+async def cancel_add_student_callback(callback: CallbackQuery, state: FSMContext):
+    await state.clear()
+    user_id = callback.from_user.id
+    kb = get_owner_kb() if is_admin(user_id) else get_instructor_kb()
+    try:
+        await callback.message.edit_text("❌ Додавання учня скасовано.")
+    except Exception:
+        pass
+    await callback.message.answer("Оберіть дію на панелі:", reply_markup=kb)
+    await callback.answer()
 
 @router.callback_query(AddStudent.car_type, F.data.startswith("car_"))
 async def process_student_car(callback: CallbackQuery, state: FSMContext):
     car_key = callback.data.split("_")[1]
     await state.update_data(car_type=car_key)
-    await callback.message.answer(
+    
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="❌ Скасувати", callback_data="cancel_add_student")]
+    ])
+    
+    await callback.message.edit_text(
         "🩺 **Медична довідка:**\n"
         "Надішліть фото медичної довідки учня (або зробіть фото та надішліть у чат).\n"
-        "*(Якщо довідки немає зараз, напишіть `пропустити`)*",
+        "*(Якщо довідки немає зараз, напишіть `пропустити` або натисніть кнопку скасування)*",
+        reply_markup=kb,
         parse_mode="Markdown"
     )
     await state.set_state(AddStudent.photo)
@@ -215,6 +249,13 @@ async def process_student_photo_file(message: Message, state: FSMContext):
 
 @router.message(AddStudent.photo, F.text)
 async def process_student_photo_text(message: Message, state: FSMContext):
+    text = message.text.strip().lower()
+    if text in ["скасувати", "відміна", "назад", "exit"]:
+        await state.clear()
+        user_id = message.from_user.id
+        kb = get_owner_kb() if is_admin(user_id) else get_instructor_kb()
+        await message.answer("❌ Додавання учня скасовано.", reply_markup=kb)
+        return
     await save_new_student_to_db(message, state, medical_photo=None)
 
 async def save_new_student_to_db(message: Message, state: FSMContext, medical_photo: str = None):
