@@ -1,12 +1,14 @@
 import asyncio
 import json
 import os
+import io
+import csv
 from datetime import datetime
 from aiogram import Bot, Dispatcher, F, Router
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery, ReplyKeyboardMarkup, KeyboardButton
+from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery, ReplyKeyboardMarkup, KeyboardButton, BufferedInputFile
 import aiohttp.web
 
 TOKEN = "8984070226:AAEVfkbSBfaX3soWjy_kHN-FLAhBu_bqZ50"
@@ -23,14 +25,15 @@ FILES = {
     "reports": os.path.join(DATA_DIR, "daily_reports.json")
 }
 
-# --- ПОСТІЙНІ КЛАВІАТУРИ ВНИЗУ (REPLY) ---
+# --- КЛАВІАТУРИ ---
 def get_owner_kb():
     return ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="➕ Додати учня"), KeyboardButton(text="👥 Учні та прогрес")],
             [KeyboardButton(text="📅 Графік занять"), KeyboardButton(text="💰 Фінанси")],
             [KeyboardButton(text="🚗 Авто та пробіг"), KeyboardButton(text="📋 Звіти інструктора")],
-            [KeyboardButton(text="🩺 Медичні довідки"), KeyboardButton(text="❌ Видалити учня")]
+            [KeyboardButton(text="🩺 Медичні довідки"), KeyboardButton(text="❌ Видалити учня")],
+            [KeyboardButton(text="📥 Вивантажити звіт в Excel")]
         ],
         resize_keyboard=True
     )
@@ -42,6 +45,15 @@ def get_instructor_kb():
             [KeyboardButton(text="👥 Учні та прогрес"), KeyboardButton(text="🏁 Завершити день (Звіт)")],
             [KeyboardButton(text="📋 Звіти інструктора")],
             [KeyboardButton(text="🩺 Медичні довідки")]
+        ],
+        resize_keyboard=True
+    )
+
+def get_student_kb():
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="📊 Мій прогрес")],
+            [KeyboardButton(text="🔗 Зв'язати профіль")]
         ],
         resize_keyboard=True
     )
@@ -76,16 +88,16 @@ def init_storage():
     })
     
     initial_students = [
-        {"id": 1, "name": "Грановський Даніїл Костянтинович", "car_type": "citroen", "total_hours": 40, "spent_hours": 22, "paid_hours": 22, "school_payments": [{"hours": 22, "amount": 22 * 900, "date": "01.08.2026"}], "rate_type": "old", "medical_photo": None},
-        {"id": 2, "name": "Гаібова Вероніка Хуршедівна", "car_type": "citroen", "total_hours": 40, "spent_hours": 26, "paid_hours": 26, "school_payments": [{"hours": 26, "amount": 26 * 900, "date": "01.08.2026"}], "rate_type": "old", "medical_photo": None},
-        {"id": 3, "name": "Криворот Єгор Олександрович", "car_type": "citroen", "total_hours": 40, "spent_hours": 16, "paid_hours": 16, "school_payments": [{"hours": 16, "amount": 16 * 900, "date": "01.08.2026"}], "rate_type": "old", "medical_photo": None},
-        {"id": 4, "name": "Мосейчук Єлізавета Вадимівна", "car_type": "citroen", "total_hours": 40, "spent_hours": 6, "paid_hours": 6, "school_payments": [{"hours": 6, "amount": 6 * 900, "date": "01.08.2026"}], "rate_type": "old", "medical_photo": None},
-        {"id": 5, "name": "Абрамова Анна Леонідівна", "car_type": "citroen", "total_hours": 40, "spent_hours": 4, "paid_hours": 4, "school_payments": [{"hours": 4, "amount": 4 * 900, "date": "01.08.2026"}], "rate_type": "old", "medical_photo": None},
-        {"id": 6, "name": "Подплетньов Олексій Васильович", "car_type": "citroen", "total_hours": 40, "spent_hours": 36, "paid_hours": 36, "school_payments": [{"hours": 36, "amount": 36 * 900, "date": "01.08.2026"}], "rate_type": "old", "medical_photo": None},
-        {"id": 7, "name": "Зіміна Аріна Володимирівна", "car_type": "hyundai", "total_hours": 40, "spent_hours": 28, "paid_hours": 28, "school_payments": [{"hours": 28, "amount": 28 * 900, "date": "01.08.2026"}], "rate_type": "old", "medical_photo": None},
-        {"id": 8, "name": "Алексеєва Марія Владиславівна", "car_type": "hyundai", "total_hours": 40, "spent_hours": 32, "paid_hours": 32, "school_payments": [{"hours": 32, "amount": 32 * 900, "date": "01.08.2026"}], "rate_type": "old", "medical_photo": None},
-        {"id": 9, "name": "Брьохова Софія Олександрівна", "car_type": "hyundai", "total_hours": 40, "spent_hours": 26, "paid_hours": 26, "school_payments": [{"hours": 26, "amount": 26 * 900, "date": "01.08.2026"}], "rate_type": "old", "medical_photo": None},
-        {"id": 10, "name": "Кардаш Станіслав Анатолійович", "car_type": "hyundai", "total_hours": 40, "spent_hours": 18, "paid_hours": 18, "school_payments": [{"hours": 18, "amount": 18 * 900, "date": "01.08.2026"}], "rate_type": "old", "medical_photo": None}
+        {"id": 1, "name": "Грановський Даніїл Костянтинович", "car_type": "citroen", "total_hours": 40, "spent_hours": 22, "paid_hours": 22, "school_payments": [{"hours": 22, "amount": 22 * 900, "date": "01.08.2026"}], "rate_type": "old", "medical_photo": None, "telegram_id": None},
+        {"id": 2, "name": "Гаібова Вероніка Хуршедівна", "car_type": "citroen", "total_hours": 40, "spent_hours": 26, "paid_hours": 26, "school_payments": [{"hours": 26, "amount": 26 * 900, "date": "01.08.2026"}], "rate_type": "old", "medical_photo": None, "telegram_id": None},
+        {"id": 3, "name": "Криворот Єгор Олександрович", "car_type": "citroen", "total_hours": 40, "spent_hours": 16, "paid_hours": 16, "school_payments": [{"hours": 16, "amount": 16 * 900, "date": "01.08.2026"}], "rate_type": "old", "medical_photo": None, "telegram_id": None},
+        {"id": 4, "name": "Мосейчук Єлізавета Вадимівна", "car_type": "citroen", "total_hours": 40, "spent_hours": 6, "paid_hours": 6, "school_payments": [{"hours": 6, "amount": 6 * 900, "date": "01.08.2026"}], "rate_type": "old", "medical_photo": None, "telegram_id": None},
+        {"id": 5, "name": "Абрамова Анна Леонідівна", "car_type": "citroen", "total_hours": 40, "spent_hours": 4, "paid_hours": 4, "school_payments": [{"hours": 4, "amount": 4 * 900, "date": "01.08.2026"}], "rate_type": "old", "medical_photo": None, "telegram_id": None},
+        {"id": 6, "name": "Подплетньов Олексій Васильович", "car_type": "citroen", "total_hours": 40, "spent_hours": 36, "paid_hours": 36, "school_payments": [{"hours": 36, "amount": 36 * 900, "date": "01.08.2026"}], "rate_type": "old", "medical_photo": None, "telegram_id": None},
+        {"id": 7, "name": "Зіміна Аріна Володимирівна", "car_type": "hyundai", "total_hours": 40, "spent_hours": 28, "paid_hours": 28, "school_payments": [{"hours": 28, "amount": 28 * 900, "date": "01.08.2026"}], "rate_type": "old", "medical_photo": None, "telegram_id": None},
+        {"id": 8, "name": "Алексеєва Марія Владиславівна", "car_type": "hyundai", "total_hours": 40, "spent_hours": 32, "paid_hours": 32, "school_payments": [{"hours": 32, "amount": 32 * 900, "date": "01.08.2026"}], "rate_type": "old", "medical_photo": None, "telegram_id": None},
+        {"id": 9, "name": "Брьохова Софія Олександрівна", "car_type": "hyundai", "total_hours": 40, "spent_hours": 26, "paid_hours": 26, "school_payments": [{"hours": 26, "amount": 26 * 900, "date": "01.08.2026"}], "rate_type": "old", "medical_photo": None, "telegram_id": None},
+        {"id": 10, "name": "Кардаш Станіслав Анатолійович", "car_type": "hyundai", "total_hours": 40, "spent_hours": 18, "paid_hours": 18, "school_payments": [{"hours": 18, "amount": 18 * 900, "date": "01.08.2026"}], "rate_type": "old", "medical_photo": None, "telegram_id": None}
     ]
     
     path = FILES["students"]
@@ -100,6 +112,9 @@ def init_storage():
             for s in current:
                 if "medical_photo" not in s:
                     s["medical_photo"] = None
+                    updated = True
+                if "telegram_id" not in s:
+                    s["telegram_id"] = None
                     updated = True
             if updated:
                 save_json("students", current)
@@ -127,9 +142,19 @@ def is_instructor(user_id: int) -> bool:
     data = load_admins_data()
     return user_id == data.get("instructor_id", 0)
 
+def get_student_by_telegram(user_id: int):
+    students = load_json("students", [])
+    for s in students:
+        if s.get("telegram_id") == user_id:
+            return s
+    return None
+
+def is_student(user_id: int) -> bool:
+    return get_student_by_telegram(user_id) is not None
+
 def is_authorized(user_id: int) -> bool:
     data = load_admins_data()
-    return user_id in data.get("admin_ids", []) or user_id == data.get("instructor_id", 0)
+    return user_id in data.get("admin_ids", []) or user_id == data.get("instructor_id", 0) or is_student(user_id)
 
 # --- СТАНИ FSM ---
 class AddStudent(StatesGroup):
@@ -164,19 +189,150 @@ class StudentPaymentState(StatesGroup):
 @router.message(Command("start"))
 async def cmd_start(message: Message):
     user_id = message.from_user.id
-    if not is_authorized(user_id):
-        await message.answer(f"❌ У вас немає доступу до цього бота.\nВаш Telegram ID: `{user_id}` (повідомте його власнику)", parse_mode="Markdown")
-        return
-        
+    
     if is_admin(user_id):
         await message.answer("Вітаю, пане власник! Оберіть потрібну дію на панелі внизу:", reply_markup=get_owner_kb())
-    else:
+    elif is_instructor(user_id):
         await message.answer("Вітаю! Меню інструктора автошколи «Шофер»:", reply_markup=get_instructor_kb())
+    elif is_student(user_id):
+        student = get_student_by_telegram(user_id)
+        await message.answer(f"Вітаю, {student['name']}! Це ваш кабінет учня в автошколі «Шофер».", reply_markup=get_student_kb())
+    else:
+        # Неавторизований або учень, чий Telegram ще не зв'язано
+        kb = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🔗 Зв'язати профіль учня", callback_data="link_student_start")]
+        ])
+        await message.answer(
+            f"❌ Ваш Telegram ID: `{user_id}` не знайдено серед адміністраторів чи інструкторів.\n\n"
+            f"Якщо ви учень нашої автошколи, натисніть кнопку нижче, щоб прив'язати свій акаунт:",
+            reply_markup=kb,
+            parse_mode="Markdown"
+        )
+
+# ==========================================
+# МІНІ-КАБІНЕТ УЧНЯ ТА ЗВ'ЯЗУВАННЯ
+# ==========================================
+@router.callback_query(F.data == "link_student_start")
+async def link_student_start_callback(callback: CallbackQuery):
+    students = load_json("students", [])
+    unlinked = [s for s in students if not s.get("telegram_id")]
+    
+    if not unlinked:
+        await callback.message.answer("Усі учні в системі вже мають прив'язані акаунти, або список порожній.")
+        await callback.answer()
+        return
+
+    kb_list = [[InlineKeyboardButton(text=f"{s['name']} ({s['car_type'].upper()})", callback_data=f"link_st_id_{s['id']}")] for s in unlinked]
+    kb = InlineKeyboardMarkup(inline_keyboard=kb_list)
+    await callback.message.answer("Оберіть ваше прізвище зі списку для зв'язування акаунта:", reply_markup=kb)
+    await callback.answer()
+
+@router.callback_query(F.data.startswith("link_st_id_"))
+async def link_student_finish_callback(callback: CallbackQuery):
+    st_id = int(callback.data.split("_")[3])
+    user_id = callback.from_user.id
+
+    students = load_json("students", [])
+    student_name = ""
+    for s in students:
+        if s["id"] == st_id:
+            s["telegram_id"] = user_id
+            student_name = s["name"]
+            break
+    save_json("students", students)
+
+    await callback.message.edit_text(f"✅ Профіль успішно зв'язано з учнем: **{student_name}**!", parse_mode="Markdown")
+    await callback.message.answer("Оберіть дію у вашому кабінеті:", reply_markup=get_student_kb())
+    await callback.answer()
+
+@router.message(F.text.func(lambda t: t and "Зв'язати профіль" in t))
+async def link_profile_btn(message: Message):
+    user_id = message.from_user.id
+    if is_student(user_id):
+        student = get_student_by_telegram(user_id)
+        await message.answer(f"Ваш акаунт уже зв'язано з учнем: **{student['name']}**.", parse_mode="Markdown", reply_markup=get_student_kb())
+        return
+    
+    students = load_json("students", [])
+    unlinked = [s for s in students if not s.get("telegram_id")]
+    if not unlinked:
+        await message.answer("Немає вільних учнів для зв'язування.")
+        return
+
+    kb_list = [[InlineKeyboardButton(text=f"{s['name']} ({s['car_type'].upper()})", callback_data=f"link_st_id_{s['id']}")] for s in unlinked]
+    kb = InlineKeyboardMarkup(inline_keyboard=kb_list)
+    await message.answer("Оберіть ваше прізвище зі списку для зв'язування акаунта:", reply_markup=kb)
+
+@router.message(F.text.func(lambda t: t and "Мій прогрес" in t))
+async def student_my_progress(message: Message):
+    user_id = message.from_user.id
+    student = get_student_by_telegram(user_id)
+    if not student:
+        await message.answer("❌ Ваш акаунт не прив'язаний до жодного учня. Натисніть «Зв'язати профіль».", reply_markup=get_student_kb())
+        return
+
+    total = student.get("total_hours", 40)
+    spent = student.get("spent_hours", 0)
+    left = total - spent
+    car_lbl = "Citroen (МКПП)" if student["car_type"] == "citroen" else "Hyundai Accent (АКПП)"
+    med_status = "✅ Завантажена" if student.get("medical_photo") else "❌ Відсутня"
+
+    msg = (
+        f"📊 **ВАШ ПРОГРЕС НАВЧАННЯ**\n\n"
+        f"👤 ПІБ: **{student['name']}**\n"
+        f"🚗 Автомобіль: {car_lbl}\n\n"
+        f"⏱ Всього годин за курсом: **{total} год**\n"
+        f"🚙 Від'їздено годин: **{spent} год**\n"
+        f"⏳ Залишилось годин: **{left} год**\n\n"
+        f"🩺 Медична довідка: {med_status}"
+    )
+    await message.answer(msg, parse_mode="Markdown", reply_markup=get_student_kb())
+
+# ==========================================
+# ЕКСПОРТ ДАНИХ У EXCEL (CSV)
+# ==========================================
+@router.message(F.text.func(lambda t: t and "Вивантажити звіт в Excel" in t))
+async def export_excel_report(message: Message):
+    if not is_authorized(message.from_user.id) or not is_admin(message.from_user.id):
+        await message.answer("❌ Ця функція доступна лише власнику.")
+        return
+
+    students = load_json("students", [])
+    if not students:
+        await message.answer("У системі немає даних про учнів для експорту.")
+        return
+
+    output = io.StringIO()
+    writer = csv.writer(output, delimiter=';')
+    
+    writer.writerow(["ID", "ПІБ учня", "Авто", "Всього годин", "Від'їздено годин", "Оплачено годин", "Медична довідка"])
+    
+    for s in students:
+        car_lbl = "Citroen (МКПП)" if s["car_type"] == "citroen" else "Hyundai Accent (АКПП)"
+        med_status = "Є довідка" if s.get("medical_photo") else "Немає"
+        writer.writerow([
+            s["id"],
+            s["name"],
+            car_lbl,
+            s["total_hours"],
+            s["spent_hours"],
+            s["paid_hours"],
+            med_status
+        ])
+
+    csv_data = output.getvalue().encode('utf-8-sig')
+    output.close()
+
+    file = BufferedInputFile(csv_data, filename=f"students_report_{datetime.now().strftime('%Y-%m-%d')}.csv")
+    await message.answer_document(
+        file, 
+        caption="📊 **Ось звіт по учнях та їхньому прогресу у форматі CSV** (можна вільно відкривати в Microsoft Excel або Google Таблицях).",
+        parse_mode="Markdown"
+    )
 
 # ==========================================
 # ДОДАВАННЯ ТА РОБОТА З МЕД. ДОВІДКАМИ
 # ==========================================
-
 @router.message(F.text.func(lambda t: t and "Додати учня" in t))
 async def process_add_student_btn(message: Message, state: FSMContext):
     if not is_authorized(message.from_user.id) or not is_admin(message.from_user.id):
@@ -198,7 +354,12 @@ async def process_add_student_btn(message: Message, state: FSMContext):
 async def cancel_add_student_callback(callback: CallbackQuery, state: FSMContext):
     await state.clear()
     user_id = callback.from_user.id
-    kb = get_owner_kb() if is_admin(user_id) else get_instructor_kb()
+    if is_admin(user_id):
+        kb = get_owner_kb()
+    elif is_instructor(user_id):
+        kb = get_instructor_kb()
+    else:
+        kb = get_student_kb()
     try:
         await callback.message.edit_text("❌ Додавання учня скасовано.")
     except Exception:
@@ -212,7 +373,7 @@ async def process_student_name(message: Message, state: FSMContext):
     if text in ["скасувати", "відміна", "назад", "exit"]:
         await state.clear()
         user_id = message.from_user.id
-        kb = get_owner_kb() if is_admin(user_id) else get_instructor_kb()
+        kb = get_owner_kb() if is_admin(user_id) else (get_instructor_kb() if is_instructor(user_id) else get_student_kb())
         await message.answer("❌ Додавання учня скасовано.", reply_markup=kb)
         return
 
@@ -259,7 +420,7 @@ async def process_student_photo_text(message: Message, state: FSMContext):
     if text in ["скасувати", "відміна", "назад", "exit"]:
         await state.clear()
         user_id = message.from_user.id
-        kb = get_owner_kb() if is_admin(user_id) else get_instructor_kb()
+        kb = get_owner_kb() if is_admin(user_id) else (get_instructor_kb() if is_instructor(user_id) else get_student_kb())
         await message.answer("❌ Додавання учня скасовано.", reply_markup=kb)
         return
     await save_new_student_to_db(message, state, medical_photo=None)
@@ -279,14 +440,15 @@ async def save_new_student_to_db(message: Message, state: FSMContext, medical_ph
         "paid_hours": 0,
         "school_payments": [],
         "rate_type": "new",
-        "medical_photo": medical_photo
+        "medical_photo": medical_photo,
+        "telegram_id": None
     }
     students.append(new_student)
     save_json("students", students)
 
     car_name = "Citroen (МКПП)" if car_key == "citroen" else "Hyundai Accent (АКПП)"
     user_id = message.from_user.id
-    kb = get_owner_kb() if is_admin(user_id) else get_instructor_kb()
+    kb = get_owner_kb() if is_admin(user_id) else (get_instructor_kb() if is_instructor(user_id) else get_student_kb())
     
     photo_status = "✅ Збережено" if medical_photo else "❌ Не додано"
     await message.answer(
@@ -438,7 +600,7 @@ async def process_new_medical_photo(message: Message, state: FSMContext):
     save_json("students", students)
 
     user_id = message.from_user.id
-    kb = get_owner_kb() if is_admin(user_id) else get_instructor_kb()
+    kb = get_owner_kb() if is_admin(user_id) else (get_instructor_kb() if is_instructor(user_id) else get_student_kb())
 
     await message.answer(
         f"✅ Медичну довідку для учня **{student_name}** успішно збережено/оновлено!",
@@ -453,7 +615,7 @@ async def process_new_medical_photo_text(message: Message, state: FSMContext):
     if text in ["скасувати", "відміна", "назад", "exit"]:
         await state.clear()
         user_id = message.from_user.id
-        kb = get_owner_kb() if is_admin(user_id) else get_instructor_kb()
+        kb = get_owner_kb() if is_admin(user_id) else (get_instructor_kb() if is_instructor(user_id) else get_student_kb())
         await message.answer("❌ Оновлення довідки скасовано.", reply_markup=kb)
     else:
         await message.answer("Будь ласка, надішліть **фотографію** медичної довідки або натисніть кнопку скасування.")
@@ -461,7 +623,6 @@ async def process_new_medical_photo_text(message: Message, state: FSMContext):
 # ==========================================
 # ІНШІ ФУНКЦІЇ БОТА (ВИДАЛЕННЯ, УЧНІ, ІНШЕ)
 # ==========================================
-
 @router.message(F.text.func(lambda t: t and "Видалити учня" in t))
 async def process_delete_student_btn(message: Message):
     if not is_authorized(message.from_user.id) or not is_admin(message.from_user.id):
@@ -614,7 +775,6 @@ async def view_instructor_reports_msg(message: Message):
 # ==========================================
 # ФІНАНСИ ТА ОПЛАТИ
 # ==========================================
-
 def calculate_financials():
     students = load_json("students", [])
     
@@ -877,7 +1037,6 @@ async def mark_paid_callback(callback: CallbackQuery, bot: Bot):
 # ==========================================
 # БЛОК ІНСТРУКТОРА: РОЗКЛАД ТА ЗВІТИ
 # ==========================================
-
 @router.message(F.text.func(lambda t: t and "Записатися на заняття" in t))
 async def sch_add_start_msg(message: Message, state: FSMContext):
     if not is_authorized(message.from_user.id):
@@ -1002,7 +1161,12 @@ async def sch_enter_hours(message: Message, state: FSMContext):
 
     car_label = "Citroen (МКПП)" if car_type == "citroen" else "Hyundai Accent (АКПП)"
     user_id = message.from_user.id
-    kb = get_owner_kb() if is_admin(user_id) else get_instructor_kb()
+    if is_admin(user_id):
+        kb = get_owner_kb()
+    elif is_instructor(user_id):
+        kb = get_instructor_kb()
+    else:
+        kb = get_student_kb()
     
     await message.answer(
         f"✅ Заняття успішно створено!\n\n"
@@ -1295,7 +1459,12 @@ async def confirm_and_send_report(callback: CallbackQuery, state: FSMContext, bo
                 pass
 
     user_id = callback.from_user.id
-    kb = get_owner_kb() if is_admin(user_id) else get_instructor_kb()
+    if is_admin(user_id):
+        kb = get_owner_kb()
+    elif is_instructor(user_id):
+        kb = get_instructor_kb()
+    else:
+        kb = get_student_kb()
     
     await callback.message.edit_text("✅ Щоденний звіт успішно підтверджено, збережено в архів та надіслано!")
     await callback.message.answer("Оберіть дію на панелі:", reply_markup=kb)
