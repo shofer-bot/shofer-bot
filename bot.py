@@ -1221,18 +1221,20 @@ async def start_daily_report_msg(message: Message, state: FSMContext):
     
     cars = load_json("cars", {})
     citroen_last = cars.get("citroen", {}).get("total_mileage", 0)
+    hyundai_last = cars.get("hyundai", {}).get("total_mileage", 0)
     
-    await state.update_data(today_sessions=[], citroen_mil=0, hyundai_mil=0, citroen_last=citroen_last)
+    await state.update_data(today_sessions=[], citroen_last=citroen_last, hyundai_last=hyundai_last)
     
     kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="✏️ Ввести кілометраж", callback_data="input_citroen_mil")],
+        [InlineKeyboardButton(text=f"✅ Не змінився ({citroen_last} км)", callback_data="citroen_unchanged")],
+        [InlineKeyboardButton(text="✏️ Ввести новий пробіг", callback_data="input_citroen_mil")],
         [InlineKeyboardButton(text="❌ Скасувати", callback_data="cancel_daily_report")]
     ])
     
     await message.answer(
         f"🚗 **Оновлення пробігу Citroen (МКПП)**\n"
         f"Попередній збережений пробіг: **{citroen_last} км**.\n"
-        f"Натисніть кнопку нижче, щоб ввести новий поточний загальний пробіг:",
+        f"Оберіть дію:",
         reply_markup=kb,
         parse_mode="Markdown"
     )
@@ -1244,6 +1246,27 @@ async def cancel_daily_report_callback(callback: CallbackQuery, state: FSMContex
     user_id = callback.from_user.id
     kb = get_owner_kb() if is_admin(user_id) else (get_instructor_kb() if is_instructor(user_id) else get_student_kb())
     await callback.message.answer("Оберіть дію на панелі:", reply_markup=kb)
+    await callback.answer()
+
+@router.callback_query(F.data == "citroen_unchanged")
+async def citroen_unchanged_callback(callback: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    citroen_last = data.get("citroen_last", 0)
+    await state.update_data(citroen_mil=citroen_last)
+    
+    hyundai_last = data.get("hyundai_last", 0)
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=f"✅ Не змінився ({hyundai_last} км)", callback_data="hyundai_unchanged")],
+        [InlineKeyboardButton(text="✏️ Ввести новий пробіг", callback_data="input_hyundai_mil")],
+        [InlineKeyboardButton(text="❌ Скасувати", callback_data="cancel_daily_report")]
+    ])
+    await callback.message.edit_text(
+        f"🚙 **Оновлення пробігу Hyundai Accent (АКПП)**\n"
+        f"Попередній збережений пробіг: **{hyundai_last} км**.\n"
+        f"Оберіть дію:",
+        reply_markup=kb,
+        parse_mode="Markdown"
+    )
     await callback.answer()
 
 @router.callback_query(F.data == "input_citroen_mil")
@@ -1272,20 +1295,50 @@ async def process_citroen_mil(message: Message, state: FSMContext):
 
     await state.update_data(citroen_mil=val)
     
-    cars = load_json("cars", {})
-    hyundai_last = cars.get("hyundai", {}).get("total_mileage", 0)
-    await state.update_data(hyundai_last=hyundai_last)
-
+    hyundai_last = data.get("hyundai_last", 0)
     kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="✏️ Ввести кілометраж Hyundai", callback_data="input_hyundai_mil")]
+        [InlineKeyboardButton(text=f"✅ Не змінився ({hyundai_last} км)", callback_data="hyundai_unchanged")],
+        [InlineKeyboardButton(text="✏️ Ввести новий пробіг", callback_data="input_hyundai_mil")],
+        [InlineKeyboardButton(text="❌ Скасувати", callback_data="cancel_daily_report")]
     ])
     await message.answer(
         f"🚙 **Оновлення пробігу Hyundai Accent (АКПП)**\n"
         f"Попередній збережений пробіг: **{hyundai_last} км**.\n"
-        f"Натисніть кнопку нижче, щоб ввести новий пробіг:",
+        f"Оберіть дію:",
         reply_markup=kb,
         parse_mode="Markdown"
     )
+
+@router.callback_query(F.data == "hyundai_unchanged")
+async def hyundai_unchanged_callback(callback: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    hyundai_last = data.get("hyundai_last", 0)
+    await state.update_data(hyundai_mil=hyundai_last)
+    
+    students = load_json("students", [])
+    if not students:
+        await callback.message.edit_text("У системі немає учнів. Зверніться до власників.")
+        await state.clear()
+        await callback.answer()
+        return
+
+    await state.set_state(DailyReport.student_choice)
+    
+    today_sessions = data.get("today_sessions", [])
+    kb_list = [[InlineKeyboardButton(text=f"{s['name']} ({s['car_type'].upper()})", callback_data=f"rep_st_{s['id']}")] for s in students]
+    kb_list.append([InlineKeyboardButton(text="🏁 Переглянути звіт (Готово)", callback_data="preview_report_flow")])
+    kb = InlineKeyboardMarkup(inline_keyboard=kb_list)
+
+    summary = "📋 **Додані заняття на сьогодні:**\n"
+    if today_sessions:
+        for sess in today_sessions:
+            summary += f"• {sess['name']}: {sess['hours']} год\n"
+    else:
+        summary += "• Поки нічого не додано\n"
+
+    full_text = f"{summary}\nОберіть учня, який займався сьогодні:"
+    await callback.message.edit_text(full_text, reply_markup=kb, parse_mode="Markdown")
+    await callback.answer()
 
 @router.callback_query(F.data == "input_hyundai_mil")
 async def input_hyundai_mil_callback(callback: CallbackQuery, state: FSMContext):
