@@ -182,11 +182,29 @@ async def process_add_student_btn(message: Message, state: FSMContext):
     if not is_authorized(message.from_user.id) or not is_admin(message.from_user.id):
         await message.answer("❌ Недостатньо прав. Ця функція лише для власників.")
         return
+    
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="❌ Скасувати", callback_data="cancel_add_student")]
+    ])
+    
     await message.answer(
-        "Введіть ПІБ нового учня:\n*(або напишіть `скасувати` для відміни)*", 
+        "Введіть ПІБ нового учня:\n*(або натисніть кнопку скасування нижче)*", 
+        reply_markup=kb,
         parse_mode="Markdown"
     )
     await state.set_state(AddStudent.name)
+
+@router.callback_query(F.data == "cancel_add_student")
+async def cancel_add_student_callback(callback: CallbackQuery, state: FSMContext):
+    await state.clear()
+    user_id = callback.from_user.id
+    kb = get_owner_kb() if is_admin(user_id) else get_instructor_kb()
+    try:
+        await callback.message.edit_text("❌ Додавання учня скасовано.")
+    except Exception:
+        pass
+    await callback.message.answer("Оберіть дію на панелі:", reply_markup=kb)
+    await callback.answer()
 
 @router.message(AddStudent.name)
 async def process_student_name(message: Message, state: FSMContext):
@@ -210,18 +228,6 @@ async def process_student_name(message: Message, state: FSMContext):
         parse_mode="Markdown"
     )
     await state.set_state(AddStudent.car_type)
-
-@router.callback_query(AddStudent.car_type, F.data == "cancel_add_student")
-async def cancel_add_student_callback(callback: CallbackQuery, state: FSMContext):
-    await state.clear()
-    user_id = callback.from_user.id
-    kb = get_owner_kb() if is_admin(user_id) else get_instructor_kb()
-    try:
-        await callback.message.edit_text("❌ Додавання учня скасовано.")
-    except Exception:
-        pass
-    await callback.message.answer("Оберіть дію на панелі:", reply_markup=kb)
-    await callback.answer()
 
 @router.callback_query(AddStudent.car_type, F.data.startswith("car_"))
 async def process_student_car(callback: CallbackQuery, state: FSMContext):
