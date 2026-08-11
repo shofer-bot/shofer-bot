@@ -1,0 +1,177 @@
+[
+    {
+        "id": 1,
+        "name": "Грановський Даніїл Костянтинович",
+        "car_type": "citroen",
+        "total_hours": 40,
+        "spent_hours": 22,
+        "paid_hours": 22,
+        "school_payments": [
+            {
+                "hours": 22.0,
+                "amount": 19800.0,
+                "date": "10.08.2026"
+            }
+        ],
+        "rate_type": "old",
+        "medical_photo": null
+    },
+    {
+        "id": 2,
+        "name": "Гаібова Вероніка Хуршедівна",
+        "car_type": "citroen",
+        "total_hours": 40,
+        "spent_hours": 26,
+        "paid_hours": 26,
+        "school_payments": [
+            {
+                "hours": 26.0,
+                "amount": 23400.0,
+                "date": "10.08.2026"
+            }
+        ],
+        "rate_type": "old",
+        "medical_photo": null
+    },
+    {
+        "id": 3,
+        "name": "Криворот Єгор Олександрович",
+        "car_type": "citroen",
+        "total_hours": 40,
+        "spent_hours": 16,
+        "paid_hours": 16,
+        "school_payments": [
+            {
+                "hours": 16.0,
+                "amount": 14400.0,
+                "date": "10.08.2026"
+            }
+        ],
+        "rate_type": "old",
+        "medical_photo": null
+    },
+    {
+        "id": 4,
+        "name": "Мосейчук Єлізавета Вадимівна",
+        "car_type": "citroen",
+        "total_hours": 40,
+        "spent_hours": 6,
+        "paid_hours": 6,
+        "school_payments": [
+            {
+                "hours": 6.0,
+                "amount": 5400.0,
+                "date": "10.08.2026"
+            }
+        ],
+        "rate_type": "old",
+        "medical_photo": null
+    },
+    {
+        "id": 5,
+        "name": "Абрамова Анна Леонідівна",
+        "car_type": "citroen",
+        "total_hours": 40,
+        "spent_hours": 4,
+        "paid_hours": 4,
+        "school_payments": [
+            {
+                "hours": 4.0,
+                "amount": 3600.0,
+                "date": "10.08.2026"
+            }
+        ],
+        "rate_type": "old",
+        "medical_photo": null
+    },
+    {
+        "id": 6,
+        "name": "Подплетньов Олексій Васильович",
+        "car_type": "citroen",
+        "total_hours": 40,
+        "spent_hours": 36,
+        "paid_hours": 36,
+        "school_payments": [
+            {
+                "hours": 36.0,
+                "amount": 32400.0,
+                "date": "10.08.2026"
+            }
+        ],
+        "rate_type": "old",
+        "medical_photo": null
+    },
+    {
+        "id": 7,
+        "name": "Зіміна Аріна Володимирівна",
+        "car_type": "hyundai",
+        "total_hours": 40,
+        "spent_hours": 28,
+        "paid_hours": 28,
+        "school_payments": [
+            {
+                "hours": 28.0,
+                "amount": 25200.0,
+                "date": "10.08.2026"
+            }
+        ],
+        "rate_type": "old",
+        "medical_photo": null
+    },
+    {
+        "id": 8,
+        "name": "Алексеєва Марія Владиславівна",
+        "car_type": "hyundai",
+        "total_hours": 40,
+        "spent_hours": 32,
+        "paid_hours": 32,
+        "school_payments": [
+            {
+                "hours": 32.0,
+                "amount": 28800.0,
+                "date": "10.08.2026"
+            }
+        ],
+        "rate_type": "old",
+        "medical_photo": null
+    },
+    {
+        "id": 9,
+        "name": "Брьохова Софія Олександрівна",
+        "car_type": "hyundai",
+        "total_hours": 40,
+        "spent_hours": 26,
+        "paid_hours": 26,
+        "school_payments": [
+            {
+                "hours": 26.0,
+                "amount": 23400.0,
+                "date": "10.08.2026"
+            }
+        ],
+        "rate_type": "old",
+        "medical_photo": null
+    },
+    {
+        "id": 10,
+        "name": "Кардаш Станіслав Анатолійович",
+        "car_type": "hyundai",
+        "total_hours": 40,
+        "spent_hours": 18,
+        "paid_hours": 18,
+        "school_payments": [
+            {
+                "hours": 18.0,
+                "amount": 16200.0,
+                "date": "10.08.2026"
+            },
+            {
+                "hours": 20.0,
+                "amount": 18000.0,
+                "date": "10.08.2026"
+            }
+        ],
+        "rate_type": "old",
+        "medical_photo": null
+    }
+]

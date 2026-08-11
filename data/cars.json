@@ -1,0 +1,10 @@
+{
+    "citroen": {
+        "name": "Citroen (МКПП)",
+        "total_mileage": 212078
+    },
+    "hyundai": {
+        "name": "Hyundai Accent (АКПП)",
+        "total_mileage": 321188
+    }
+}

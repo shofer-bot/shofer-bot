@@ -1,0 +1,29 @@
+[
+    {
+        "id": 1,
+        "student_id": 10,
+        "student_name": "Кардаш Станіслав Анатолійович",
+        "car_type": "hyundai",
+        "date": "12.08.26",
+        "time": "10:00",
+        "hours": 2.0
+    },
+    {
+        "id": 2,
+        "student_id": 10,
+        "student_name": "Кардаш Станіслав Анатолійович",
+        "car_type": "hyundai",
+        "date": "12.08.2026",
+        "time": "10:00",
+        "hours": 2.0
+    },
+    {
+        "id": 3,
+        "student_id": 9,
+        "student_name": "Брьохова Софія Олександрівна",
+        "car_type": "hyundai",
+        "date": "12.08.2026",
+        "time": "12:00",
+        "hours": 2.0
+    }
+]
