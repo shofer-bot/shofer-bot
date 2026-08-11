@@ -1,4 +1,4 @@
-import asyncio
+[cite: 5]import asyncio
 import json
 import os
 import io
@@ -1212,31 +1212,106 @@ async def sch_delete_lesson(callback: CallbackQuery):
     await callback.message.answer("✅ Заняття успішно видалено/скасовано з розкладу.")
     await callback.answer()
 
-# --- ЩОДЕННИЙ ЗВІТ ---
+# --- ЩОДЕННИЙ ЗВІТ З ІНЛАЙН-КНОПКАМИ ТА ПЕРЕВІРКОЮ ПРОБІГУ ---
 @router.message(F.text.func(lambda t: t and "Завершити день" in t))
 async def start_daily_report_msg(message: Message, state: FSMContext):
     if not is_authorized(message.from_user.id):
         await message.answer("❌ Недостатньо прав.")
         return
-    await state.update_data(today_sessions=[], citroen_mil=0, hyundai_mil=0)
-    await message.answer("Введіть поточний **загальний пробіг** авто **Citroen (МКПП)** в кілометрах (тільки число):", parse_mode="Markdown")
+    
+    cars = load_json("cars", {})
+    citroen_last = cars.get("citroen", {}).get("total_mileage", 0)
+    
+    await state.update_data(today_sessions=[], citroen_mil=0, hyundai_mil=0, citroen_last=citroen_last)
+    
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="✏️ Ввести кілометраж", callback_data="input_citroen_mil")],
+        [InlineKeyboardButton(text="❌ Скасувати", callback_data="cancel_daily_report")]
+    ])
+    
+    await message.answer(
+        f"🚗 **Оновлення пробігу Citroen (МКПП)**\n"
+        f"Попередній збережений пробіг: **{citroen_last} км**.\n"
+        f"Натисніть кнопку нижче, щоб ввести новий поточний загальний пробіг:",
+        reply_markup=kb,
+        parse_mode="Markdown"
+    )
+
+@router.callback_query(F.data == "cancel_daily_report")
+async def cancel_daily_report_callback(callback: CallbackQuery, state: FSMContext):
+    await state.clear()
+    await callback.message.edit_text("❌ Звіт дня скасовано.")
+    user_id = callback.from_user.id
+    kb = get_owner_kb() if is_admin(user_id) else (get_instructor_kb() if is_instructor(user_id) else get_student_kb())
+    await callback.message.answer("Оберіть дію на панелі:", reply_markup=kb)
+    await callback.answer()
+
+@router.callback_query(F.data == "input_citroen_mil")
+async def input_citroen_mil_callback(callback: CallbackQuery, state: FSMContext):
+    await callback.message.edit_text("Введіть поточний **загальний пробіг** авто **Citroen (МКПП)** в кілометрах (тільки число):", parse_mode="Markdown")
     await state.set_state(DailyReport.citroen_mileage)
+    await callback.answer()
 
 @router.message(DailyReport.citroen_mileage)
 async def process_citroen_mil(message: Message, state: FSMContext):
     if not message.text.isdigit():
-        await message.answer("Будь ласка, введіть числове значення пробігу.")
+        await message.answer("❌ Будь ласка, введіть числове значення пробігу.")
         return
-    await state.update_data(citroen_mil=int(message.text))
-    await message.answer("Введіть поточний **загальний пробіг** авто **Hyundai Accent (АКПП)** в кілометрах (тільки число):", parse_mode="Markdown")
+    
+    val = int(message.text)
+    data = await state.get_data()
+    last_val = data.get("citroen_last", 0)
+
+    if val < last_val:
+        await message.answer(
+            f"⚠️ **Увага!** Введений пробіг ({val} км) менший за попередній збережений ({last_val} км).\n"
+            f"Будь ласка, введіть коректний актуальний пробіг:",
+            parse_mode="Markdown"
+        )
+        return
+
+    await state.update_data(citroen_mil=val)
+    
+    cars = load_json("cars", {})
+    hyundai_last = cars.get("hyundai", {}).get("total_mileage", 0)
+    await state.update_data(hyundai_last=hyundai_last)
+
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="✏️ Ввести кілометраж Hyundai", callback_data="input_hyundai_mil")]
+    ])
+    await message.answer(
+        f"🚙 **Оновлення пробігу Hyundai Accent (АКПП)**\n"
+        f"Попередній збережений пробіг: **{hyundai_last} км**.\n"
+        f"Натисніть кнопку нижче, щоб ввести новий пробіг:",
+        reply_markup=kb,
+        parse_mode="Markdown"
+    )
+
+@router.callback_query(F.data == "input_hyundai_mil")
+async def input_hyundai_mil_callback(callback: CallbackQuery, state: FSMContext):
+    await callback.message.edit_text("Введіть поточний **загальний пробіг** авто **Hyundai Accent (АКПП)** в кілометрах (тільки число):", parse_mode="Markdown")
     await state.set_state(DailyReport.hyundai_mileage)
+    await callback.answer()
 
 @router.message(DailyReport.hyundai_mileage)
 async def process_hyundai_mil(message: Message, state: FSMContext):
     if not message.text.isdigit():
-        await message.answer("Будь ласка, введіть числове значення пробігу.")
+        await message.answer("❌ Будь ласка, введіть числове значення пробігу.")
         return
-    await state.update_data(hyundai_mil=int(message.text))
+    
+    val = int(message.text)
+    data = await state.get_data()
+    last_val = data.get("hyundai_last", 0)
+
+    if val < last_val:
+        await message.answer(
+            f"⚠️ **Увага!** Введений пробіг ({val} км) менший за попередній збережений ({last_val} км).\n"
+            f"Будь ласка, введіть коректний актуальний пробіг:",
+            parse_mode="Markdown"
+        )
+        return
+
+    await state.update_data(hyundai_mil=val)
     
     students = load_json("students", [])
     if not students:
@@ -1279,31 +1354,49 @@ async def choose_student_for_report(callback: CallbackQuery, state: FSMContext):
     await state.update_data(current_student_id=st_id)
     await state.set_state(DailyReport.hours_spent)
     
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="1 година", callback_data="hours_1_0"), InlineKeyboardButton(text="1.5 години", callback_data="hours_1_5")],
+        [InlineKeyboardButton(text="2 години", callback_data="hours_2_0")],
+        [InlineKeyboardButton(text="❌ Скасувати", callback_data="cancel_daily_report")]
+    ])
+    
     await callback.message.edit_text(
         f"👤 Обрано учня: **{st_name}**\n\n"
-        f"Введіть кількість годин (зазвичай 1, 1.5 або 2).\n"
-        f"⚠️ *Правило:* Одне заняття — максимум 2 години. Якщо учень їздив довше, додайте його звіт кілька разів:",
+        f"Оберіть кількість годин заняття або введіть вручну числом (наприклад, `1`, `1.5`, `2`):",
+        reply_markup=kb,
         parse_mode="Markdown"
     )
     await callback.answer()
 
+@router.callback_query(DailyReport.hours_spent, F.data.startswith("hours_"))
+async def process_hours_callback(callback: CallbackQuery, state: FSMContext):
+    parts = callback.data.split("_")
+    hours = float(f"{parts[1]}.{parts[2]}")
+    await handle_hours_saving(callback.message, state, hours, is_callback=True)
+    await callback.answer()
+
 @router.message(DailyReport.hours_spent)
-async def save_student_daily_hours(message: Message, state: FSMContext):
+async def save_student_daily_hours_msg(message: Message, state: FSMContext):
     text_val = message.text.strip().replace(",", ".")
     try:
         hours = float(text_val)
     except ValueError:
         await message.answer("❌ Будь ласка, введіть числове значення годин (наприклад: `1`, `1.5`, `2`).", parse_mode="Markdown")
         return
+    await handle_hours_saving(message, state, hours, is_callback=False)
 
+async def handle_hours_saving(message: Message, state: FSMContext, hours: float, is_callback: bool = False):
     if not (1.0 <= hours <= 2.0):
-        await message.answer(
+        err_text = (
             "❌ **Помилка у кількості годин!**\n"
             "Одне заняття зазвичай триває від 1 до 2 годин.\n"
             "Якщо учень від'їздив більше 2 годин, внесіть дані про нього у звіт **двічі**.\n\n"
-            "Спробуйте ввести коректну кількість годин:",
-            parse_mode="Markdown"
+            "Спробуйте ввести коректну кількість годин:"
         )
+        if is_callback:
+            await message.answer(err_text, parse_mode="Markdown")
+        else:
+            await message.answer(err_text, parse_mode="Markdown")
         return
 
     data = await state.get_data()
