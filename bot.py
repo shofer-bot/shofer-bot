@@ -11,7 +11,8 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery, ReplyKeyboardMarkup, KeyboardButton, BufferedInputFile
 import aiohttp.web
 
-TOKEN = "8984070226:AAEVfkbSBfaX3soWjy_kHN-FLAhBu_bqZ50"
+# Токен береться із змінних середовища для безпеки та коректної роботи на Render.com
+TOKEN = os.getenv("BOT_TOKEN")
 
 router = Router()
 DATA_DIR = "data"
@@ -198,7 +199,6 @@ async def cmd_start(message: Message):
         student = get_student_by_telegram(user_id)
         await message.answer(f"Вітаю, {student['name']}! Це ваш кабінет учня в автошколі «Шофер».", reply_markup=get_student_kb())
     else:
-        # Неавторизований або учень, чий Telegram ще не зв'язано
         kb = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="🔗 Зв'язати профіль учня", callback_data="link_student_start")]
         ])
