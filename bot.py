@@ -266,7 +266,7 @@ async def link_student_finish_callback(callback: CallbackQuery):
     await callback.message.answer("Оберіть дію у вашому кабінеті:", reply_markup=get_student_kb())
     await callback.answer()
 
-@router.message(F.text.func(lambda t: t and "Зв'язати профіль" in t))
+@router.message(F.text.contains("Зв'язати профіль"))
 async def link_profile_btn(message: Message):
     user_id = message.from_user.id
     if is_student(user_id):
@@ -285,7 +285,7 @@ async def link_profile_btn(message: Message):
     kb = InlineKeyboardMarkup(inline_keyboard=kb_list)
     await message.answer("Оберіть ваше прізвище зі списку для зв'язування акаунта:", reply_markup=kb)
 
-@router.message(F.text.func(lambda t: t and "Мій прогрес" in t))
+@router.message(F.text.contains("Мій прогрес"))
 async def student_my_progress(message: Message):
     user_id = message.from_user.id
     student = get_student_by_telegram(user_id)
@@ -313,7 +313,7 @@ async def student_my_progress(message: Message):
 # ==========================================
 # ЕКСПОРТ ДАНИХ У EXCEL (CSV)
 # ==========================================
-@router.message(F.text.func(lambda t: t and "Вивантажити звіт в Excel" in t))
+@router.message(F.text.contains("Вивантажити звіт в Excel"))
 async def export_excel_report(message: Message):
     if not is_authorized(message.from_user.id) or not is_admin(message.from_user.id):
         await message.answer("❌ Ця функція доступна лише власнику.")
@@ -355,7 +355,7 @@ async def export_excel_report(message: Message):
 # ==========================================
 # ДОДАВАННЯ ТА РОБОТА З МЕД. ДОВІДКАМИ
 # ==========================================
-@router.message(F.text.func(lambda t: t and "Додати учня" in t))
+@router.message(F.text.contains("Додати учня"))
 async def process_add_student_btn(message: Message, state: FSMContext):
     if not is_authorized(message.from_user.id) or not is_admin(message.from_user.id):
         await message.answer("❌ Недостатньо прав. Ця функція лише для власників.")
@@ -507,7 +507,7 @@ async def save_new_student_to_db(message: Message, state: FSMContext, medical_ph
     )
     await state.clear()
 
-@router.message(F.text.func(lambda t: t and "Медичні довідки" in t))
+@router.message(F.text.contains("Медичні довідки"))
 async def view_medical_certificates_msg(message: Message):
     if not is_authorized(message.from_user.id):
         await message.answer("❌ Недостатньо прав.")
@@ -670,7 +670,7 @@ async def process_new_medical_photo_text(message: Message, state: FSMContext):
 # ==========================================
 # ІНШІ ФУНКЦІЇ БОТА (ВИДАЛЕННЯ, УЧНІ, ІНШЕ)
 # ==========================================
-@router.message(F.text.func(lambda t: t and "Видалити учня" in t))
+@router.message(F.text.contains("Видалити учня"))
 async def process_delete_student_btn(message: Message):
     if not is_authorized(message.from_user.id) or not is_admin(message.from_user.id):
         await message.answer("❌ Недостатньо прав. Ця функція лише для власників.")
@@ -710,7 +710,7 @@ async def process_delete_student_callback(callback: CallbackQuery):
     await callback.message.edit_text(f"✅ Учня **{student_name}** та всі його заплановані заняття успішно видалено з бази.", parse_mode="Markdown")
     await callback.answer()
 
-@router.message(F.text.func(lambda t: t and "Учні та прогрес" in t))
+@router.message(F.text.contains("Учні та прогрес"))
 async def view_students_list_msg(message: Message):
     if not is_authorized(message.from_user.id):
         await message.answer("❌ Недостатньо прав.")
@@ -768,7 +768,7 @@ async def view_students_list_msg(message: Message):
 
     await message.answer(msg, parse_mode="Markdown")
 
-@router.message(F.text.func(lambda t: t and "Графік занять" in t))
+@router.message(F.text.contains("Графік занять"))
 async def view_schedule_admin_msg(message: Message):
     if not is_authorized(message.from_user.id) or not is_admin(message.from_user.id):
         await message.answer("❌ Ця функція доступна лише власнику.")
@@ -787,7 +787,7 @@ async def view_schedule_admin_msg(message: Message):
 
     await message.answer(msg, parse_mode="Markdown")
 
-@router.message(F.text.func(lambda t: t and "Авто та пробіг" in t))
+@router.message(F.text.contains("Авто та пробіг"))
 async def view_cars_msg(message: Message):
     if not is_authorized(message.from_user.id) or not is_admin(message.from_user.id):
         await message.answer("❌ Ця функція доступна лише власнику.")
@@ -798,7 +798,7 @@ async def view_cars_msg(message: Message):
         msg += f"- {val['name']}: **{val['total_mileage']} км**\n"
     await message.answer(msg, parse_mode="Markdown")
 
-@router.message(F.text.func(lambda t: t and "Звіти інструктора" in t))
+@router.message(F.text.contains("Звіти інструктора"))
 async def view_instructor_reports_msg(message: Message):
     if not is_authorized(message.from_user.id):
         await message.answer("❌ Недостатньо прав.")
@@ -878,7 +878,7 @@ def calculate_financials():
         "total_user_hyundai": total_user_hyundai
     }
 
-@router.message(F.text.func(lambda t: t and "Фінанси" in t))
+@router.message(F.text.contains("Фінанси"))
 async def show_finances_msg(message: Message):
     if not is_authorized(message.from_user.id) or not is_admin(message.from_user.id):
         await message.answer("❌ Ця функція доступна лише власнику.")
@@ -1087,7 +1087,7 @@ async def mark_paid_callback(callback: CallbackQuery, bot: Bot):
 # ==========================================
 # БЛОК ІНСТРУКТОРА: РОЗКЛАД ТА ЗВІТИ
 # ==========================================
-@router.message(F.text.func(lambda t: t and "Записатися на заняття" in t))
+@router.message(F.text.contains("Записатися на заняття"))
 async def sch_add_start_msg(message: Message, state: FSMContext):
     if not is_authorized(message.from_user.id):
         await message.answer("❌ Недостатньо прав.")
@@ -1241,7 +1241,7 @@ async def sch_enter_hours(message: Message, state: FSMContext):
     )
     await state.clear()
 
-@router.message(F.text.func(lambda t: t and "Розклад" in t))
+@router.message(F.text.contains("Розклад"))
 async def sch_view_instructor_msg(message: Message):
     if not is_authorized(message.from_user.id):
         await message.answer("❌ Недостатньо прав.")
@@ -1275,7 +1275,7 @@ async def sch_delete_lesson(callback: CallbackQuery):
     await callback.answer()
 
 # --- ЩОДЕННИЙ ЗВІТ З ІНЛАЙН-КНОПКАМИ ТА ПЕРЕВІРКОЮ ПРОБІГУ ---
-@router.message(F.text.func(lambda t: t and "Завершити день" in t))
+@router.message(F.text.contains("Завершити день"))
 async def start_daily_report_msg(message: Message, state: FSMContext):
     if not is_authorized(message.from_user.id):
         await message.answer("❌ Недостатньо прав.")
@@ -1760,4 +1760,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-```[cite: 8]
